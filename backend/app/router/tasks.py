@@ -12,7 +12,7 @@ from app.services.tasks import create_task, get_tasks, get_task, update_task,del
 router = APIRouter(prefix="/tasks", tags=["Tasks"],)
 
 
-@router.post("", response_model=TaskResponse)
+@router.post("/create", response_model=TaskResponse)
 def create(
     task: TaskCreate,
     db: Session = Depends(get_db),
@@ -84,5 +84,5 @@ def delete(
     delete_task(
         task_id=task_id,
         db=db,
-        current_user=current_user
+        current_user=current_user,
     )

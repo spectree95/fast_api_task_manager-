@@ -4,11 +4,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
-from backend.app.core.config import settings
-from backend.app.core.database import Base,get_db
-from backend.app.models.users import User
-from backend.app.models.tasks import Task
+from app.main import app
+from app.core.config import settings
+from app.core.database import Base,get_db
+from app.models.users import User
+from app.models.tasks import Task
 
 
 TEST_DATABASE_URL = settings.TEST_DATABASE_URL
@@ -51,3 +51,47 @@ def client(db):
         yield test_client
         
     app.dependency_overrides.clear()
+    
+    
+@pytest.fixture
+def auth_headers(client):
+    password = "Test123456!"
+    client.post(
+        "/users/register",
+        json={
+            "username": "taskuser",
+            "email": "task@example.com",
+            "password": password,
+            "first_name": "Task",
+            "last_name": "User",
+        },
+    )
+    
+    login_response = client.post(
+        "/users/login",
+        data={
+            "username": "taskuser",
+            "password": password
+        },
+    )
+    
+    token = login_response.json()["access_token"]
+    assert login_response.status_code == 200
+    return {
+        "Authorization": f"Bearer {token}"
+    }
+    
+
+@pytest.fixture
+def task(client, auth_headers):
+    create_response = client.post(
+        "/tasks/create",
+        json={
+            "title": "test title",
+            "description": "test description"
+        },
+        headers=auth_headers,
+    )
+    
+    assert create_response.status_code == 200
+    return create_response.json()

@@ -57,10 +57,7 @@ def login_user(
     db_user = db.execute(
         select(User).where(User.username==user.username)
         ).scalar_one_or_none()
-    
-    print("LOGIN USERNAME:", user.username)
-    print("DB USER:", db_user)  
-    print("HASH:", db_user.password)
+
         
     if not db_user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password.")
