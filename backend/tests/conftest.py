@@ -95,3 +95,50 @@ def task(client, auth_headers):
     
     assert create_response.status_code == 200
     return create_response.json()
+
+
+@pytest.fixture
+def tasks(client, auth_headers):
+    
+    tasks_data = [
+        {
+            "title": "Task 1",
+            "description": "First task",
+        },
+        {
+            "title": "Task 2",
+            "description": "Second task",
+        },
+        {
+            "title": "Task 3",
+            "description": "Third task",
+        },
+        {
+            "title": "Task 4",
+            "description": "Fourth task",
+        },
+    ]
+    
+    created_tasks = []
+    
+    for task_data in tasks_data:
+        response = client.post(
+            "/tasks/create",
+            json=task_data,
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        created_tasks.append(response.json())
+    
+    for task in created_tasks[:2]:
+        response = client.patch(
+            f"/tasks/{task['id']}",
+            json={
+                "completed": True,
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+
+    return created_tasks        
