@@ -1,140 +1,60 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Depends
 
 from app.models.users import User
 from app.models.tasks import Task
-from app.schemas.tasks import TaskCreate, TaskUpdate, SortField, OrderField, TaskListResponce
+from app.schemas.tasks import TaskCreate, TaskUpdate, TaskFilter, TaskListResponce
 from app.core.exceptions import TaskNotFoundExceptions
+from app.repositories.task import TaskRepository
 
-
-def create_task(
-    db: Session,
-    task:TaskCreate,
-    current_user: User,
-):
-    db_task = Task(
-        title = task.title,
-        description = task.description,
-        owner_id = current_user.id
-    )
+class TaskService:
     
-    db.add(db_task)
-    db.commit()
-    db.refresh(db_task)
+    def __init__(self, db: Session, repository: TaskRepository):
+        self.db = db
+        self.task_repository = repository
     
-    return db_task
-
-
-def get_tasks(
-    skip: int,
-    limit: int,
-    completed: bool | None,
-    sort: SortField,
-    order: OrderField,
-    db: Session,
-    current_user: User,
-):
-    query = select(Task)
-    
-    if completed is not None:
-        query = query.where(Task.completed == completed)
+    def create_task(self, task:TaskCreate):
         
-    count_query = select(func.count(Task.id))
-    
-    if completed is not None:
-        count_query = count_query.where(
-            Task.completed == completed,
-            Task.owner_id == current_user.id    
-        )
-    
-    total = db.execute(count_query).scalar_one()
-    
-    sorted_columns = {
-        SortField.created_at: Task.created_at,
-        SortField.updated_at: Task.updated_at,
-        SortField.title: Task.title
-    }
-    
-    sorted_column = sorted_columns[sort]
-    
-    if order == OrderField.desc:
-        query = query.order_by(sorted_column.desc())
+        return self.task_repository.create(task)
+          
+
+    def get_tasks(self,task_filter: TaskFilter,):
+        tasks = self.task_repository.get_tasks(task_filter)
+        return tasks
+
+
+    def get_task(self,task_id: int,):
+        task = self.task_repository.get_by_id(task_id)
         
-    elif order == OrderField.asc:
-        query = query.order_by(sorted_column.asc())
-    
-    query = query.offset(skip).limit(limit)
-    
-    tasks = db.execute(query).scalars().all()
-    return TaskListResponce(
-        items=tasks,
-        total=total,
-        skip=skip,
-        limit=limit,
+        if task is None:
+            raise TaskNotFoundExceptions()
         
-    )
+        return task
+        
 
+    def update_task(
+        self,
+        task_id: int,
+        task_data: TaskUpdate,
+    ):
+        task = self.task_repository.get_by_id(task_id)
+        
+        if task is None:
+            raise TaskNotFoundExceptions()
+        
+        update_data = task_data.model_dump(exclude_unset=True)
 
+        
+        return self.task_repository.update(task_id, update_data)
+        
 
+    def delete_task(self,task_id: int,):
+        task = self.task_repository.get_by_id(task_id)
+        if task is None:
+            raise TaskNotFoundExceptions()
+        else:
+            self.task_repository.delete(task_id)
 
-
-def get_task(
-    db: Session,
-    task_id: int,
-    current_user: User
-):
-    task = db.execute(select(Task).where(
-        Task.id == task_id,
-        Task.owner_id == current_user.id,    
-    )).scalar_one_or_none()
-    
-    if task is None:
-        raise TaskNotFoundExceptions()
-    
-    return task
-    
-
-def update_task(
-    task_id: int,
-    db: Session,
-    current_user: User,
-    task_data: TaskUpdate,
-):
-    task = db.execute(select(Task).where(
-        Task.id == task_id,
-        Task.owner_id == current_user.id,
-    )).scalar_one_or_none()
-    
-    if task is None:
-        raise TaskNotFoundExceptions()
-    
-    update_data = task_data.model_dump(exclude_unset=True)
-
-    for field, value in update_data.items():
-        setattr(task, field, value)
-    
-    db.commit()
-    db.refresh(task)
-    
-    return task
-    
-
-def delete_task(
-    task_id: int,
-    db:Session,
-    current_user: User,
-):
-    task = db.execute(select(Task).where(
-        Task.id == task_id,
-        Task.owner_id == current_user.id
-    )).scalar_one_or_none()
-    
-    if task is None:
-        raise TaskNotFoundExceptions()
-    
-    db.delete(task)
-    db.commit()
-    
-    
-    
+        
+        

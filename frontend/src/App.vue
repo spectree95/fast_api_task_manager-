@@ -1,10 +1,19 @@
-<script setup></script>
+<script setup>
+import {ref} from "vue"
+const count = ref(0)
+
+const name = "Nurbol"
+</script>
 
 <template>
-  <h1>You did it!</h1>
+  <h1>Task manager</h1>
+  <h2>{{count}}</h2>
+
+  <button @click="count++">
+    +1
+  </button>
   <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
+    Hello, {{name}}!
   </p>
 </template>
 

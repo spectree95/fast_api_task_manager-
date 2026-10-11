@@ -1,110 +1,83 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from fastapi import HTTPException, status
 
 from app.core.security import hash_password, create_access_token,verify_password
 from app.models.users import User
 from app.schemas.users import UserCreate, UserLogin, UserUpdate
+from fastapi.security import OAuth2PasswordRequestForm
+from app.repositories.users import UserRepository
 
 
+class UserService:
 
 
+    def __init__(self, db:Session, repository: UserRepository):
+        self.db = db
+        self.user_repository = repository
 
 
-def create_user(
-    db: Session,
-    user: UserCreate
-):
-    existing_username = db.execute(
-        select(User).where(User.username == user.username)
-    ).scalar_one_or_none()
-    
-    
-    if existing_username:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists.")
-    
-    existing_email = db.execute(
-        select(User).where(User.email == user.email)
-    ).scalar_one_or_none()
-    
-    
-    if existing_email:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists.")
-    
-    hashed_password = hash_password(user.password)
-    
-    db_user = User(
-        username = user.username,
-        email = user.email,
-        password = hashed_password,
-        first_name = user.first_name,
-        last_name = user.last_name,
-    )
-    
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+    def get_user(self,username,email):
+        return self.user_repository.get_user(username=username, email=email)
 
 
+    def create_user(self,user_data: UserCreate):
+        existing_username = self.user_repository.get_user(username=user_data.username)
 
-def login_user(
-    db: Session,
-    user:UserLogin
-):
-    
-    db_user = db.execute(
-        select(User).where(User.username==user.username)
-        ).scalar_one_or_none()
+        if existing_username:
+            raise ValueError("Username already exists.")
 
+        existing_email = self.user_repository.get_user_by_email(email=user_data.email)
+
+        if existing_email:
+            raise ValueError("This email address is already in use.")
         
-    if not db_user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password.")
-    
-    
-    if not verify_password(user.password, db_user.password):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password.")
-    
-    
-    access_token = create_access_token(
-        data={
-            "sub": str(db_user.id)
-        }
-    )
-    
-    return {"access_token":access_token, "token_type": "bearer"}
+        return self.user_repository.create(user_data)
+        
 
 
-def update_user(
-    user_data: UserUpdate,
-    db: Session,
-    current_user: User
-):
-    existing_username = db.execute(select(User).where(
-        User.username == user_data.username
-    )).scalar_one_or_none()
-    
-    if existing_username:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Username already exists.')
-    
-    
-    update_data = user_data.model_dump(exclude_unset=True)
-    
-    for field, value in update_data.items():
-        setattr(current_user, field, value)    
-    
-    db.commit()
-    db.refresh(current_user)
-    
-    return current_user
+    def login_user(self,form_data: OAuth2PasswordRequestForm):
+        
+        db_user = self.user_repository.get_user(username=form_data.username)
+
+            
+        if not db_user:
+            raise ValueError(status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password.")
+        
+        
+        if not verify_password(form_data.password, db_user.password):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password.")
+        
+        
+        access_token = create_access_token(
+            data={
+                "sub": str(db_user.id)
+            }
+        )
+        
+        return {"access_token":access_token, "token_type": "bearer"}
+
+
+    def update_user(
+        self,
+        user_data: UserUpdate,
+        current_user: User
+    ):
+        user = self.user_repository.get_user(user_data.username)
+        if user:
+            raise ValueError("Username already exists.")
+        
+        update_data = user_data.model_dump(exclude_unset=True)
+        
+        if not update_data:
+            return current_user
+        
+        
+        return self.user_repository.update(user_data=update_data, current_user=current_user)
 
 
 
-def delete_user(
-    db:Session,
-    current_user: User,
-):
-    db.delete(current_user)
-    db.commit()
-    
+    def delete_user(self,current_user: User,):
+        self.user_repository.delete(current_user)
+        

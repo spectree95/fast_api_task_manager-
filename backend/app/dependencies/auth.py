@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 from app.core.security import decode_access_token
 from app.core.database import get_db
 from app.models.users import User
+from app.repositories.users import UserRepository
+from app.services.users import UserService
+
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/users/login"
@@ -31,3 +34,14 @@ def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials.")
     
     return db_user
+
+
+def get_user_repository(db: Session = Depends()) -> UserRepository:
+    return UserRepository(db) 
+
+
+def get_user_service(
+    db: Session = Depends(get_db),
+    repository: UserRepository = Depends(get_user_repository)
+):
+    return UserService(db=db, repository=repository)

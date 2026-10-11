@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from app.models.users import User 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from enum import Enum
 
 class TaskCreate(BaseModel):
@@ -50,4 +50,11 @@ class OrderField(str, Enum):
     asc = "asc"
     desc = "desc"
     
+    
+class TaskFilter(BaseModel):
+    skip: int = Field(0, ge=0),
+    limit: int = Field(10, ge=1, le=100),
+    completed: bool | None = None,
+    sort: SortField = SortField.created_at,
+    order: OrderField = OrderField.desc,
     
