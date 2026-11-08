@@ -36,7 +36,7 @@ def get_current_user(
     return db_user
 
 
-def get_user_repository(db: Session = Depends()) -> UserRepository:
+def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
     return UserRepository(db) 
 
 

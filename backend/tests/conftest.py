@@ -2,42 +2,29 @@ import pytest
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.core.config import settings
 from app.core.database import Base,get_db
 from app.models.users import User
 from app.models.tasks import Task
 
 
-TEST_DATABASE_URL = settings.TEST_DATABASE_URL
-
-engine = create_engine(TEST_DATABASE_URL)
-
-TestingSessionLocal = sessionmaker(
-    autoflush = False,
-    autocommit = False,
-    bind = engine,
-)
-
-@pytest.fixture(scope="session", autouse=True)
-def setup_database():
-    Base.metadata.create_all(bind=engine)
-    
-    yield
-    
-    Base.metadata.drop_all(bind=engine)
-    
-    
 @pytest.fixture
 def db():
-    db = TestingSessionLocal()
-    
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    session = sessionmaker(autoflush=False, bind=engine)()
     try:
-        yield db
+        yield session
     finally:
-        db.close()
+        session.close()
+        engine.dispose()
         
 
 @pytest.fixture
@@ -47,17 +34,18 @@ def client(db):
     
     app.dependency_overrides[get_db] = override_get_db
     
-    with TestClient(app) as test_client:
-        yield test_client
-        
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
     
     
 @pytest.fixture
 def auth_headers(client):
     password = "Test123456!"
-    client.post(
-        "/users/register",
+    registration = client.post(
+        "/users/",
         json={
             "username": "taskuser",
             "email": "task@example.com",
@@ -67,6 +55,7 @@ def auth_headers(client):
         },
     )
     
+    assert registration.status_code == 201, registration.text
     login_response = client.post(
         "/users/login",
         data={
@@ -75,8 +64,8 @@ def auth_headers(client):
         },
     )
     
+    assert login_response.status_code == 200, login_response.text
     token = login_response.json()["access_token"]
-    assert login_response.status_code == 200
     return {
         "Authorization": f"Bearer {token}"
     }
@@ -141,4 +130,4 @@ def tasks(client, auth_headers):
 
         assert response.status_code == 200
 
-    return created_tasks        
+    return created_tasks

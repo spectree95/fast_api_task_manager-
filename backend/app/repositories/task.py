@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import select,func
+from sqlalchemy import select, func, or_
 
 from app.models.tasks import Task
 from app.schemas.tasks import TaskCreate, TaskFilter, TaskListResponce, OrderField, SortField
@@ -24,25 +24,26 @@ class TaskRepository:
     
     
     def get_tasks(self, task_filter: TaskFilter) -> TaskListResponce:
-        query = select(Task)
-                
+        filters = [Task.owner_id == self.current_user.id]
+
         if task_filter.completed is not None:
-            query = query.where(Task.completed == task_filter.completed)
-                    
-        count_query = select(func.count(Task.id))
-                
-        if task_filter.completed is not None:
-            count_query = count_query.where(
-                Task.completed == task_filter.completed,
-                Task.owner_id == task_filter.current_user.id    
-            )
-                
+            filters.append(Task.completed == task_filter.completed)
+
+        if task_filter.q:
+            filters.append(or_(
+                Task.title.icontains(task_filter.q, autoescape=True),
+                Task.description.icontains(task_filter.q, autoescape=True),
+            ))
+
+        # Reuse every filter so pagination totals describe the same result set.
+        query = select(Task).where(*filters)
+        count_query = select(func.count(Task.id)).where(*filters)
         total = self.db.execute(count_query).scalar_one()
                 
         sorted_columns = {
-            task_filter.SortField.created_at: Task.created_at,
-            task_filter.SortField.updated_at: Task.updated_at,
-            task_filter.SortField.title: Task.title
+            SortField.created_at: Task.created_at,
+            SortField.updated_at: Task.updated_at,
+            SortField.title: Task.title
         }
                 
         sorted_column = sorted_columns[task_filter.sort]
@@ -53,7 +54,7 @@ class TaskRepository:
         elif task_filter.order == OrderField.asc:
             query = query.order_by(sorted_column.asc())
                 
-        query = query.offset(task_filter.skip).limit(task_filter.limit)
+        query = query.order_by(Task.id).offset(task_filter.skip).limit(task_filter.limit)
                 
         tasks = self.db.execute(query).scalars().all()
         return TaskListResponce(
@@ -79,13 +80,13 @@ class TaskRepository:
         
         for field, value in data.items():
             setattr(task, field, value)
-            self.db.commit()
-            self.db.refresh(task)
+        self.db.commit()
+        self.db.refresh(task)
         return task        
                 
     
     
     def delete(self, task_id: int) -> None:
-        task = self.db.execute(select(Task).where(Task.id==task_id, Task.owner_id == self.current_user.id))
-        return self.db.delete(task)
-    
+        task = self.get_by_id(task_id)
+        self.db.delete(task)
+        self.db.commit()

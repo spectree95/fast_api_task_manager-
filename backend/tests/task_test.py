@@ -48,7 +48,7 @@ def test_update_task(client, auth_headers, task):
     task_id = task["id"]
     
     update_response = client.patch(
-        f"tasks/{task_id}",
+        f"/tasks/{task_id}",
         json={
             "description": "test"
         },
@@ -76,7 +76,7 @@ def test_delete_task(client, auth_headers, task):
     assert delete_task.status_code == 204
     
     get_task = client.get(
-        f"tasks/{task_id}",
+        f"/tasks/{task_id}",
         headers=auth_headers,
     )
     
@@ -86,14 +86,9 @@ def test_stranger_task_(client, auth_headers, task):
     
     task_id = task["id"]
     
-    client.post(
-        "/users/logout",
-    )
-
-    
     password2 = "Test123456!"
     client.post(
-        "users/register",
+        "/users/",
         json={
             "username": "taskuser2",
             "email": "task2@example.com",

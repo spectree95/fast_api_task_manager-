@@ -7,7 +7,7 @@ def test_register_user(client, db):
     password = "Test123456!"
 
     response = client.post(
-        "/users/register",
+        "/users/",
         json={
             "username": "testuser",
             "email": "test@example.com",
@@ -38,7 +38,7 @@ def test_login_user(client):
     password = "Test123456!"
 
     register_response = client.post(
-        "/users/register",
+        "/users/",
         json={
             "username": "loginuser",
             "email": "login@example.com",
@@ -70,7 +70,7 @@ def test_get_current_user(client):
     password = "Test123456!"
 
     register_response = client.post(
-        "/users/register",
+        "/users/",
         json={
             "username": "meuser",
             "email": "me@example.com",

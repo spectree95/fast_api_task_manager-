@@ -43,7 +43,7 @@ class UserService:
 
             
         if not db_user:
-            raise ValueError(status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password.")
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password.")
         
         
         if not verify_password(form_data.password, db_user.password):
@@ -65,7 +65,7 @@ class UserService:
         current_user: User
     ):
         user = self.user_repository.get_user(user_data.username)
-        if user:
+        if user and user.id != current_user.id:
             raise ValueError("Username already exists.")
         
         update_data = user_data.model_dump(exclude_unset=True)

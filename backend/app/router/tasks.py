@@ -1,11 +1,7 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, status, Query
-from sqlalchemy.orm import Session
-
-
-from app.core.database import get_db
-from app.dependencies.auth import get_current_user
 from app.dependencies.task import get_task_service
-from app.models.users import User
 from app.schemas.tasks import TaskCreate, TaskResponse, TaskListResponce, TaskUpdate, TaskFilter
 from app.services.tasks import TaskService
 
@@ -23,7 +19,7 @@ def create(
 
 @router.get("", response_model=TaskListResponce)
 def tasks(
-    task_filters: TaskFilter = Depends(),
+    task_filters: Annotated[TaskFilter, Query()],
     service: TaskService = Depends(get_task_service),
 ):
     return service.get_tasks(task_filters)
